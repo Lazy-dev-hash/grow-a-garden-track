@@ -1,0 +1,59 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌾 Grow A Garden Stock Tracker</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-content">
+                <h1 class="title">🌾 Grow A Garden Stock Tracker</h1>
+                <div class="status-indicator">
+                    <div class="status-dot" id="statusDot"></div>
+                    <span id="statusText">Connecting...</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="datetime-display">
+            <div class="time-section">
+                <div class="time" id="currentTime"></div>
+                <div class="date" id="currentDate"></div>
+                <div class="day" id="currentDay"></div>
+            </div>
+        </div>
+
+        <div class="weather-section" id="weatherSection" style="display: none;">
+            <h3>🌤️ Current Weather</h3>
+            <div class="weather-content" id="weatherContent"></div>
+        </div>
+
+        <div class="stock-grid" id="stockGrid">
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <p>Loading stock data...</p>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <div class="built-by">
+                <span class="built-text">Built by</span>
+                <span class="author-name">Sunnel John Rebano</span>
+            </div>
+            <div class="footer-datetime">
+                <div class="footer-time" id="footerTime"></div>
+                <div class="footer-date" id="footerDate"></div>
+                <div class="footer-day" id="footerDay"></div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
