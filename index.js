@@ -82,12 +82,17 @@ function ensureWebSocketConnection() {
 
       const updatedAt = getPHTime();
 
-      // Emit to all connected clients
-      io.emit('stockUpdate', {
+      const updateData = {
         stockData,
         weather,
         updatedAt
-      });
+      };
+
+      // Store latest data
+      latestStockData = updateData;
+
+      // Emit to all connected clients
+      io.emit('stockUpdate', updateData);
 
     } catch (error) {
       console.error('Error processing WebSocket message:', error);
@@ -107,9 +112,59 @@ function ensureWebSocketConnection() {
   });
 }
 
+// Store latest data
+let latestStockData = null;
+
 // Socket.io connection handling
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
   console.log('Client connected');
+  
+  // Send latest data to newly connected client if available
+  if (latestStockData) {
+    socket.emit('stockUpdate', latestStockData);
+  } else {
+    // Fetch initial data if not available
+    try {
+      const response = await axios.get('https://growagardenstock.com/api/stock');
+      const stock = response.data;
+      
+      const stockData = {
+        gear: stock.gear || { items: [] },
+        seed: stock.seed || { items: [] },
+        egg: stock.egg || { items: [] },
+        cosmetics: stock.cosmetics || { items: [] },
+        event: stock.honey || { items: [] },
+        travelingmerchant: stock.travelingmerchant || { items: [] }
+      };
+
+      // Get weather data
+      const weather = await axios.get("https://growagardenstock.com/api/stock/weather")
+        .then(res => res.data).catch(() => null);
+
+      const initialData = {
+        stockData,
+        weather,
+        updatedAt: getPHTime()
+      };
+
+      latestStockData = initialData;
+      socket.emit('stockUpdate', initialData);
+    } catch (error) {
+      console.error('Error fetching initial stock data:', error);
+      socket.emit('stockUpdate', {
+        stockData: {
+          gear: { items: [] },
+          seed: { items: [] },
+          egg: { items: [] },
+          cosmetics: { items: [] },
+          event: { items: [] },
+          travelingmerchant: { items: [] }
+        },
+        weather: null,
+        updatedAt: getPHTime()
+      });
+    }
+  }
   
   socket.on('disconnect', () => {
     console.log('Client disconnected');
