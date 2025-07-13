@@ -14,6 +14,9 @@ const stockGrid = document.getElementById('stockGrid');
 const weatherSection = document.getElementById('weatherSection');
 const weatherContent = document.getElementById('weatherContent');
 
+// Admin panel state
+let adminPanelOpen = false;
+
 // Time update function
 function updateDateTime() {
     const now = new Date();
@@ -215,6 +218,18 @@ socket.on('stockUpdate', (data) => {
     updateStockDisplay(data);
 });
 
+socket.on('specialItemNotification', (data) => {
+    showSpecialItemNotification(data);
+});
+
+socket.on('adminResponse', (data) => {
+    handleAdminResponse(data);
+});
+
+socket.on('notifierUpdate', (data) => {
+    showNotifierUpdate(data);
+});
+
 // Store restock data for countdown updates
 let restockData = {};
 
@@ -242,6 +257,219 @@ function updateCountdowns() {
     });
 }
 
+// Show special item notification
+function showSpecialItemNotification(data) {
+    const notification = document.createElement('div');
+    notification.className = 'special-notification';
+    notification.innerHTML = `
+        <div class="notification-content">
+            <h3>🚨 SPECIAL ITEMS IN STOCK! 🚨</h3>
+            <div class="special-items">
+                ${data.items.map(item => 
+                    `<div class="special-item">
+                        <span>${item.emoji} ${item.name}</span>
+                        <span class="quantity">${formatValue(item.quantity)}</span>
+                        <span class="category">(${item.category})</span>
+                    </div>`
+                ).join('')}
+            </div>
+            <div class="notification-time">${data.timestamp.toLocaleString()}</div>
+            <button onclick="this.parentElement.parentElement.remove()" class="close-btn">×</button>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto remove after 10 seconds
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.remove();
+        }
+    }, 10000);
+    
+    // Add sound notification (optional)
+    playNotificationSound();
+}
+
+// Play notification sound
+function playNotificationSound() {
+    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBzmI0/LNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBzmI0/LNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBzmI0/LNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBzmI0/LNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBzmI0/LNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmgfBzmI0/LNeSsF');
+    audio.volume = 0.3;
+    audio.play().catch(() => {}); // Ignore errors if audio can't play
+}
+
+// Handle admin response
+function handleAdminResponse(data) {
+    const adminConsole = document.getElementById('adminConsole');
+    if (adminConsole) {
+        const message = document.createElement('div');
+        message.className = data.success ? 'admin-success' : 'admin-error';
+        message.textContent = data.message;
+        adminConsole.appendChild(message);
+        adminConsole.scrollTop = adminConsole.scrollHeight;
+        
+        if (data.notifierList) {
+            updateNotifierList(data.notifierList);
+        }
+    }
+}
+
+// Show notifier update
+function showNotifierUpdate(data) {
+    if (data.type === 'userAdded') {
+        showToast(`✅ ${data.user.name} subscribed to notifications (Total: ${data.totalSubscribers})`);
+    }
+}
+
+// Show toast notification
+function showToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => toast.classList.add('show'), 100);
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Toggle admin panel
+function toggleAdminPanel() {
+    adminPanelOpen = !adminPanelOpen;
+    
+    if (adminPanelOpen) {
+        showAdminPanel();
+    } else {
+        hideAdminPanel();
+    }
+}
+
+// Show admin panel
+function showAdminPanel() {
+    const adminPanel = document.createElement('div');
+    adminPanel.id = 'adminPanel';
+    adminPanel.className = 'admin-panel';
+    adminPanel.innerHTML = `
+        <div class="admin-content">
+            <div class="admin-header">
+                <h3>🔑 Admin Panel</h3>
+                <button onclick="toggleAdminPanel()" class="close-btn">×</button>
+            </div>
+            
+            <div class="admin-login" id="adminLogin">
+                <input type="password" id="adminPassword" placeholder="Admin Password" />
+                <button onclick="authenticateAdmin()" class="admin-btn">Login</button>
+            </div>
+            
+            <div class="admin-controls" id="adminControls" style="display: none;">
+                <div class="admin-section">
+                    <h4>Add Notifier</h4>
+                    <input type="text" id="userIdInput" placeholder="User ID" />
+                    <input type="text" id="userNameInput" placeholder="User Name" />
+                    <button onclick="addNotifier()" class="admin-btn">Add User</button>
+                </div>
+                
+                <div class="admin-section">
+                    <h4>Notifier List</h4>
+                    <button onclick="listNotifiers()" class="admin-btn">Refresh List</button>
+                    <div id="notifierList" class="notifier-list"></div>
+                </div>
+                
+                <div class="admin-console" id="adminConsole"></div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(adminPanel);
+}
+
+// Hide admin panel
+function hideAdminPanel() {
+    const adminPanel = document.getElementById('adminPanel');
+    if (adminPanel) {
+        adminPanel.remove();
+    }
+}
+
+// Authenticate admin
+function authenticateAdmin() {
+    const password = document.getElementById('adminPassword').value;
+    const adminLogin = document.getElementById('adminLogin');
+    const adminControls = document.getElementById('adminControls');
+    
+    socket.emit('adminCommand', {
+        command: 'listNotifiers',
+        password: password
+    });
+    
+    // Store password for subsequent requests
+    window.adminPassword = password;
+    
+    adminLogin.style.display = 'none';
+    adminControls.style.display = 'block';
+}
+
+// Add notifier
+function addNotifier() {
+    const userId = document.getElementById('userIdInput').value;
+    const userName = document.getElementById('userNameInput').value;
+    
+    if (!userId || !userName) {
+        alert('Please enter both User ID and Name');
+        return;
+    }
+    
+    socket.emit('adminCommand', {
+        command: 'addNotifier',
+        password: window.adminPassword,
+        userId: userId,
+        name: userName
+    });
+    
+    // Clear inputs
+    document.getElementById('userIdInput').value = '';
+    document.getElementById('userNameInput').value = '';
+}
+
+// List notifiers
+function listNotifiers() {
+    socket.emit('adminCommand', {
+        command: 'listNotifiers',
+        password: window.adminPassword
+    });
+}
+
+// Update notifier list display
+function updateNotifierList(notifiers) {
+    const listContainer = document.getElementById('notifierList');
+    if (!listContainer) return;
+    
+    if (notifiers.length === 0) {
+        listContainer.innerHTML = '<p>No notifiers registered</p>';
+        return;
+    }
+    
+    listContainer.innerHTML = notifiers.map(user => `
+        <div class="notifier-item">
+            <span class="user-name">${user.name}</span>
+            <span class="user-id">${user.userId}</span>
+            <span class="user-platform">${user.platform || 'web'}</span>
+            <button onclick="removeNotifier('${user.userId}')" class="remove-btn">Remove</button>
+        </div>
+    `).join('');
+}
+
+// Remove notifier
+function removeNotifier(userId) {
+    socket.emit('adminCommand', {
+        command: 'removeNotifier',
+        password: window.adminPassword,
+        userId: userId
+    });
+}
+
 // Initialize
 updateDateTime();
 setInterval(updateDateTime, 1000);
@@ -262,6 +490,16 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('mouseout', (e) => {
         if (e.target.closest('.stock-category')) {
             e.target.closest('.stock-category').style.transform = 'translateY(0) scale(1)';
+        }
+    });
+    
+    // Add admin panel trigger (triple click on title)
+    let clickCount = 0;
+    document.querySelector('.title').addEventListener('click', () => {
+        clickCount++;
+        setTimeout(() => clickCount = 0, 1000);
+        if (clickCount === 3) {
+            toggleAdminPanel();
         }
     });
 });
