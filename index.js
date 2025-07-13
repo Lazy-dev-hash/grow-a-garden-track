@@ -448,8 +448,30 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+app.get('/bot-test', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'bot-test.html'));
+});
+
 // API Routes
 app.use(express.json());
+
+// Bot testing API endpoint
+app.post('/api/test-bot', (req, res) => {
+  const { message, userId } = req.body;
+  
+  if (!message || !userId) {
+    return res.status(400).json({ error: 'Message and userId required' });
+  }
+
+  // Simulate bot response
+  handleFacebookMessage(userId, message);
+  
+  res.json({ 
+    success: true, 
+    timestamp: getPHTime().toISOString(),
+    message: 'Bot response simulated'
+  });
+});
 
 // Facebook webhook verification
 app.get('/webhook', (req, res) => {
