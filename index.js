@@ -1,4 +1,3 @@
-
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -61,12 +60,12 @@ function ensureWebSocketConnection() {
 
       const stock = payload.data;
       const stockData = {
-        gear: stock.gear || { items: [] },
-        seed: stock.seed || { items: [] },
-        egg: stock.egg || { items: [] },
-        cosmetics: stock.cosmetics || { items: [] },
-        event: stock.honey || { items: [] },
-        travelingmerchant: stock.travelingmerchant || { items: [] }
+        gear: stock.gear || { items: [], countdown: null },
+        seed: stock.seed || { items: [], countdown: null },
+        egg: stock.egg || { items: [], countdown: null },
+        cosmetics: stock.cosmetics || { items: [], countdown: null },
+        event: stock.event || { items: [], countdown: null },
+        travelingmerchant: stock.travelingmerchant || { items: [], appearIn: null }
       };
 
       updateLastSeen("gear", stockData.gear.items);
@@ -118,7 +117,7 @@ let latestStockData = null;
 // Socket.io connection handling
 io.on('connection', async (socket) => {
   console.log('Client connected');
-  
+
   // Send latest data to newly connected client if available
   if (latestStockData) {
     socket.emit('stockUpdate', latestStockData);
@@ -127,14 +126,14 @@ io.on('connection', async (socket) => {
     try {
       const response = await axios.get('https://growagardenstock.com/api/stock');
       const stock = response.data;
-      
+
       const stockData = {
-        gear: stock.gear || { items: [] },
-        seed: stock.seed || { items: [] },
-        egg: stock.egg || { items: [] },
-        cosmetics: stock.cosmetics || { items: [] },
-        event: stock.honey || { items: [] },
-        travelingmerchant: stock.travelingmerchant || { items: [] }
+        gear: stock.gear || { items: [], countdown: null },
+        seed: stock.seed || { items: [], countdown: null },
+        egg: stock.egg || { items: [], countdown: null },
+        cosmetics: stock.cosmetics || { items: [], countdown: null },
+        event: stock.event || { items: [], countdown: null },
+        travelingmerchant: stock.travelingmerchant || { items: [], appearIn: null }
       };
 
       // Get weather data
@@ -153,19 +152,19 @@ io.on('connection', async (socket) => {
       console.error('Error fetching initial stock data:', error);
       socket.emit('stockUpdate', {
         stockData: {
-          gear: { items: [] },
-          seed: { items: [] },
-          egg: { items: [] },
-          cosmetics: { items: [] },
-          event: { items: [] },
-          travelingmerchant: { items: [] }
+          gear: { items: [], countdown: null },
+          seed: { items: [], countdown: null },
+          egg: { items: [], countdown: null },
+          cosmetics: { items: [], countdown: null },
+          event: { items: [], countdown: null },
+          travelingmerchant: { items: [], appearIn: null }
         },
         weather: null,
         updatedAt: getPHTime()
       });
     }
   }
-  
+
   socket.on('disconnect', () => {
     console.log('Client disconnected');
   });

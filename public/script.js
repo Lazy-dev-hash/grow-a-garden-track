@@ -62,12 +62,12 @@ function formatValue(val) {
 }
 
 // Create stock category HTML
-function createStockCategory(title, emoji, items, restockInfo) {
+function createStockCategory(title, emoji, items, restockInfo, categoryKey) {
     const availableItems = items.filter(item => item.quantity > 0);
     
     if (availableItems.length === 0) {
         return `
-            <div class="stock-category">
+            <div class="stock-category" data-category="${categoryKey}">
                 <div class="category-header">
                     <h3 class="category-title">${emoji} ${title}</h3>
                     <span class="item-count">0 items</span>
@@ -86,7 +86,7 @@ function createStockCategory(title, emoji, items, restockInfo) {
     `).join('');
     
     return `
-        <div class="stock-category">
+        <div class="stock-category" data-category="${categoryKey}">
             <div class="category-header">
                 <h3 class="category-title">${emoji} ${title}</h3>
                 <span class="item-count">${availableItems.length} items</span>
@@ -113,48 +113,80 @@ function updateStockDisplay(data) {
         `;
     }
     
+    // Parse countdown times and store for updates
+    const parseCountdown = (countdownStr) => {
+        if (!countdownStr) return null;
+        
+        // Parse countdown string like "1h 23m 45s" or "23m 45s" or "45s"
+        const timeMatch = countdownStr.match(/(?:(\d+)h\s*)?(?:(\d+)m\s*)?(?:(\d+)s)?/);
+        if (timeMatch) {
+            const hours = parseInt(timeMatch[1] || 0);
+            const minutes = parseInt(timeMatch[2] || 0);
+            const seconds = parseInt(timeMatch[3] || 0);
+            
+            const totalMs = (hours * 60 * 60 + minutes * 60 + seconds) * 1000;
+            return new Date(Date.now() + totalMs);
+        }
+        return null;
+    };
+
     // Create categories
     const categories = [
         {
             title: 'Gear',
             emoji: '🛠️',
             items: stockData.gear.items || [],
-            restock: stockData.gear.countdown
+            restock: stockData.gear.countdown,
+            key: 'gear'
         },
         {
             title: 'Seeds',
             emoji: '🌱',
             items: stockData.seed.items || [],
-            restock: stockData.seed.countdown
+            restock: stockData.seed.countdown,
+            key: 'seed'
         },
         {
             title: 'Eggs',
             emoji: '🥚',
             items: stockData.egg.items || [],
-            restock: stockData.egg.countdown
+            restock: stockData.egg.countdown,
+            key: 'egg'
         },
         {
             title: 'Cosmetics',
             emoji: '🎨',
             items: stockData.cosmetics.items || [],
-            restock: stockData.cosmetics.countdown
+            restock: stockData.cosmetics.countdown,
+            key: 'cosmetics'
         },
         {
             title: 'Event',
             emoji: '🎉',
             items: stockData.event.items || [],
-            restock: stockData.event.countdown
+            restock: stockData.event.countdown,
+            key: 'event'
         },
         {
             title: 'Traveling Merchant',
             emoji: '🚚',
             items: stockData.travelingmerchant.items || [],
-            restock: stockData.travelingmerchant.appearIn
+            restock: stockData.travelingmerchant.appearIn,
+            key: 'travelingmerchant'
         }
     ];
     
+    // Store restock data for countdown updates
+    categories.forEach(cat => {
+        if (cat.restock) {
+            restockData[cat.key] = {
+                endTime: parseCountdown(cat.restock)
+            };
+        }
+    });
+    
     const categoriesHtml = categories.map(cat => 
-        createStockCategory(cat.title, cat.emoji, cat.items, cat.restock)
+        createStockCategory(cat.title, cat.emoji, cat.items, cat.restock, cat.key)
     ).join('');
     
     stockGrid.innerHTML = categoriesHtml;
@@ -183,9 +215,37 @@ socket.on('stockUpdate', (data) => {
     updateStockDisplay(data);
 });
 
+// Store restock data for countdown updates
+let restockData = {};
+
+// Function to update countdown timers
+function updateCountdowns() {
+    Object.keys(restockData).forEach(category => {
+        const countdown = restockData[category];
+        if (countdown && countdown.endTime) {
+            const now = new Date();
+            const timeLeft = countdown.endTime - now;
+            
+            if (timeLeft > 0) {
+                const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+                const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+                
+                const countdownText = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                
+                const restockElement = document.querySelector(`[data-category="${category}"] .restock-info`);
+                if (restockElement) {
+                    restockElement.textContent = `⏳ Restock In: ${countdownText}`;
+                }
+            }
+        }
+    });
+}
+
 // Initialize
 updateDateTime();
 setInterval(updateDateTime, 1000);
+setInterval(updateCountdowns, 1000);
 
 // Add some visual flair
 document.addEventListener('DOMContentLoaded', () => {
