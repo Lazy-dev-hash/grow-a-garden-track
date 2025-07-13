@@ -80,7 +80,7 @@ async function sendFacebookNotification(message) {
 // Check for target items and notify
 function checkTargetItems(stockData) {
   const foundItems = [];
-  
+
   Object.keys(stockData).forEach(category => {
     if (stockData[category] && stockData[category].items) {
       stockData[category].items.forEach(item => {
@@ -89,7 +89,7 @@ function checkTargetItems(stockData) {
           const isTargetItem = targetItems.some(target => 
             itemName.includes(target.toLowerCase())
           );
-          
+
           if (isTargetItem) {
             foundItems.push({
               name: item.name,
@@ -102,7 +102,7 @@ function checkTargetItems(stockData) {
       });
     }
   });
-  
+
   if (foundItems.length > 0) {
     const message = `🚨 SPECIAL ITEMS IN STOCK! 🚨\n\n` +
       foundItems.map(item => 
@@ -110,10 +110,10 @@ function checkTargetItems(stockData) {
       ).join('\n') +
       `\n\n⏰ ${getPHTime().toLocaleString('en-US', { timeZone: 'Asia/Manila' })} (PH Time)` +
       `\n🌾 Grow A Garden Stock Tracker`;
-    
+
     // Send Facebook notification
     sendFacebookNotification(message);
-    
+
     // Notify all users via socket
     io.emit('specialItemNotification', {
       items: foundItems,
@@ -126,28 +126,28 @@ function checkTargetItems(stockData) {
 // Set restock timer
 function setRestockTimer(category, countdown) {
   if (!countdown) return;
-  
+
   // Parse countdown string
   const timeMatch = countdown.match(/(?:(\d+)h\s*)?(?:(\d+)m\s*)?(?:(\d+)s)?/);
   if (timeMatch) {
     const hours = parseInt(timeMatch[1] || 0);
     const minutes = parseInt(timeMatch[2] || 0);
     const seconds = parseInt(timeMatch[3] || 0);
-    
+
     const totalMs = (hours * 60 * 60 + minutes * 60 + seconds) * 1000;
-    
+
     // Clear existing timer
     if (restockTimers.has(category)) {
       clearTimeout(restockTimers.get(category));
     }
-    
+
     // Set new timer
     const timer = setTimeout(() => {
       console.log(`Restock timer expired for ${category}, fetching fresh data...`);
       fetchAndUpdateStock();
       restockTimers.delete(category);
     }, totalMs);
-    
+
     restockTimers.set(category, timer);
     console.log(`Restock timer set for ${category}: ${countdown}`);
   }
@@ -158,7 +158,7 @@ async function fetchAndUpdateStock() {
   try {
     const response = await axios.get('https://growagardenstock.com/api/stock');
     const stock = response.data;
-    
+
     const stockData = {
       gear: stock.gear || { items: [], countdown: null },
       seed: stock.seed || { items: [], countdown: null },
@@ -199,7 +199,7 @@ async function fetchAndUpdateStock() {
 
     latestStockData = updateData;
     io.emit('stockUpdate', updateData);
-    
+
     console.log('Stock data refreshed automatically');
   } catch (error) {
     console.error('Error fetching stock data:', error);
@@ -324,7 +324,7 @@ io.on('connection', async (socket) => {
         egg: stock.egg || { items: [], countdown: null },
         cosmetics: stock.cosmetics || { items: [], countdown: null },
         event: stock.event || { items: [], countdown: null },
-        travelingmerchant: stock.travelingmerchant || { items: [], appearIn: null }
+        travelingmerchant: { items: [], appearIn: null }
       };
 
       // Get weather data
@@ -368,38 +368,38 @@ io.on('connection', async (socket) => {
   // Handle admin commands
   socket.on('adminCommand', (data) => {
     const { command, password, userId, name } = data;
-    
+
     if (!ADMIN_PASSWORDS.includes(password)) {
       socket.emit('adminResponse', { success: false, message: 'Invalid admin password' });
       return;
     }
-    
+
     if (command === 'addNotifier') {
       if (!userId || !name) {
         socket.emit('adminResponse', { success: false, message: 'User ID and name required' });
         return;
       }
-      
+
       const existing = notifierList.find(u => u.userId === userId);
       if (existing) {
         socket.emit('adminResponse', { success: false, message: 'User already in notifier list' });
         return;
       }
-      
+
       notifierList.push({
         userId,
         name,
         addedAt: getPHTime().toISOString(),
         addedBy: 'admin'
       });
-      
+
       saveNotifierList();
       socket.emit('adminResponse', { 
         success: true, 
         message: `Added ${name} to notifier list`,
         notifierCount: notifierList.length
       });
-      
+
       // Send notification to all clients about new subscriber
       io.emit('notifierUpdate', {
         type: 'userAdded',
@@ -407,7 +407,7 @@ io.on('connection', async (socket) => {
         totalSubscribers: notifierList.length
       });
     }
-    
+
     if (command === 'listNotifiers') {
       socket.emit('adminResponse', {
         success: true,
@@ -415,19 +415,19 @@ io.on('connection', async (socket) => {
         count: notifierList.length
       });
     }
-    
+
     if (command === 'removeNotifier') {
       if (!userId) {
         socket.emit('adminResponse', { success: false, message: 'User ID required' });
         return;
       }
-      
+
       const index = notifierList.findIndex(u => u.userId === userId);
       if (index === -1) {
         socket.emit('adminResponse', { success: false, message: 'User not found in notifier list' });
         return;
       }
-      
+
       const removed = notifierList.splice(index, 1)[0];
       saveNotifierList();
       socket.emit('adminResponse', { 
@@ -454,11 +454,11 @@ app.use(express.json());
 // Facebook webhook verification
 app.get('/webhook', (req, res) => {
   const VERIFY_TOKEN = 'garden_stock_webhook_token';
-  
+
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
-  
+
   if (mode === 'subscribe' && token === VERIFY_TOKEN) {
     console.log('Webhook verified');
     res.status(200).send(challenge);
@@ -470,21 +470,21 @@ app.get('/webhook', (req, res) => {
 // Handle Facebook webhook events
 app.post('/webhook', (req, res) => {
   const body = req.body;
-  
+
   if (body.object === 'page') {
     body.entry.forEach((entry) => {
       const webhook_event = entry.messaging[0];
       console.log('Facebook webhook event:', webhook_event);
-      
+
       if (webhook_event.message) {
         const sender_psid = webhook_event.sender.id;
         const message_text = webhook_event.message.text;
-        
+
         // Handle Facebook messages
         handleFacebookMessage(sender_psid, message_text);
       }
     });
-    
+
     res.status(200).send('EVENT_RECEIVED');
   } else {
     res.sendStatus(404);
@@ -494,7 +494,7 @@ app.post('/webhook', (req, res) => {
 // Handle Facebook messages
 async function handleFacebookMessage(sender_psid, message_text) {
   const lowerMessage = message_text.toLowerCase();
-  
+
   if (lowerMessage.includes('subscribe') || lowerMessage.includes('notify')) {
     // Add user to notifier list
     const existing = notifierList.find(u => u.userId === sender_psid);
@@ -507,7 +507,7 @@ async function handleFacebookMessage(sender_psid, message_text) {
         platform: 'facebook'
       });
       saveNotifierList();
-      
+
       await sendFacebookMessage(sender_psid, 
         '🌾 You are now subscribed to Grow A Garden stock notifications! ' +
         'You\'ll be notified when special items (Master Sprinkler, Godly Sprinkler, Advance Sprinkler, Ember Lily, Beanstalk) are in stock.'
@@ -528,7 +528,7 @@ async function handleFacebookMessage(sender_psid, message_text) {
     if (latestStockData) {
       const { stockData } = latestStockData;
       const foundItems = [];
-      
+
       Object.keys(stockData).forEach(category => {
         if (stockData[category] && stockData[category].items) {
           stockData[category].items.forEach(item => {
@@ -537,7 +537,7 @@ async function handleFacebookMessage(sender_psid, message_text) {
               const isTargetItem = targetItems.some(target => 
                 itemName.includes(target.toLowerCase())
               );
-              
+
               if (isTargetItem) {
                 foundItems.push(`${item.emoji || ''} ${item.name}: ${formatValue(item.quantity)}`);
               }
@@ -545,11 +545,11 @@ async function handleFacebookMessage(sender_psid, message_text) {
           });
         }
       });
-      
+
       const message = foundItems.length > 0 
         ? `🌾 Special items currently in stock:\n${foundItems.join('\n')}`
         : '❌ No special items currently in stock.';
-      
+
       await sendFacebookMessage(sender_psid, message);
     } else {
       await sendFacebookMessage(sender_psid, '⏳ Stock data is being loaded...');
@@ -585,11 +585,176 @@ async function sendFacebookMessage(recipient_psid, message) {
   }
 }
 
+// Auto uptime system - Auto-detect deployment URL
+let DEPLOYMENT_URL = null;
+
+// Auto-detect deployment URL
+function detectDeploymentURL() {
+  // Try environment variables from different platforms
+  const possibleUrls = [
+    process.env.REPL_URL,
+    process.env.RENDER_EXTERNAL_URL,
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+    process.env.RAILWAY_STATIC_URL,
+    process.env.HEROKU_APP_NAME ? `https://${process.env.HEROKU_APP_NAME}.herokuapp.com` : null,
+    process.env.DEPLOYMENT_URL,
+    process.env.APP_URL,
+    process.env.PUBLIC_URL
+  ];
+
+  // Find first valid URL
+  for (const url of possibleUrls) {
+    if (url && url.startsWith('http')) {
+      DEPLOYMENT_URL = url;
+      console.log(`🌐 Auto-detected deployment URL: ${DEPLOYMENT_URL}`);
+      return DEPLOYMENT_URL;
+    }
+  }
+
+  // Fallback - try to detect from request headers later
+  console.log('⚠️ No deployment URL found in environment variables. Will detect from first request.');
+  return null;
+}
+
+// Store deployment URL from incoming requests
+app.use((req, res, next) => {
+  if (!DEPLOYMENT_URL && req.headers.host) {
+    const protocol = req.headers['x-forwarded-proto'] || (req.connection.encrypted ? 'https' : 'http');
+    DEPLOYMENT_URL = `${protocol}://${req.headers.host}`;
+    console.log(`🌐 Detected deployment URL from request: ${DEPLOYMENT_URL}`);
+  }
+  next();
+});
+
+// Keep-alive endpoint
+app.get('/keep-alive', (req, res) => {
+  res.status(200).json({
+    status: 'alive',
+    timestamp: getPHTime().toISOString(),
+    uptime: process.uptime(),
+    notifiers: notifierList.length,
+    activeTimers: restockTimers.size,
+    deploymentUrl: DEPLOYMENT_URL,
+    platform: detectPlatform()
+  });
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    websocket: sharedWebSocket ? sharedWebSocket.readyState === WebSocket.OPEN : false,
+    timestamp: getPHTime().toISOString(),
+    memory: process.memoryUsage(),
+    notifierCount: notifierList.length,
+    deploymentUrl: DEPLOYMENT_URL,
+    platform: detectPlatform()
+  });
+});
+
+// Detect deployment platform
+function detectPlatform() {
+  if (process.env.REPL_SLUG) return 'Replit';
+  if (process.env.RENDER) return 'Render';
+  if (process.env.VERCEL) return 'Vercel';
+  if (process.env.RAILWAY_ENVIRONMENT) return 'Railway';
+  if (process.env.DYNO) return 'Heroku';
+  if (process.env.NETLIFY) return 'Netlify';
+  return 'Unknown';
+}
+
+// Auto uptime function
+function startUptimeSystem() {
+  // Wait a bit for URL detection
+  setTimeout(() => {
+    if (!DEPLOYMENT_URL) {
+      console.log('⚠️ No deployment URL detected yet. Uptime system will start once URL is detected.');
+      return;
+    }
+
+    const platform = detectPlatform();
+    console.log(`🚀 Starting uptime system for ${platform} deployment: ${DEPLOYMENT_URL}`);
+
+    // Ping self every 5 minutes to keep alive
+    const uptimeInterval = setInterval(async () => {
+      if (!DEPLOYMENT_URL) {
+        console.log('⏳ Waiting for deployment URL detection...');
+        return;
+      }
+
+      try {
+        const response = await axios.get(`${DEPLOYMENT_URL}/keep-alive`, {
+          timeout: 10000,
+          headers: {
+            'User-Agent': 'GrowAGarden-UptimeBot/1.0',
+            'Accept': 'application/json'
+          }
+        });
+        console.log(`🟢 Uptime ping successful [${platform}]: ${response.data.status} - ${new Date().toISOString()}`);
+      } catch (error) {
+        console.error('🔴 Uptime ping failed:', error.message);
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+
+    // Extended keep-alive ping every 15 minutes
+    const healthInterval = setInterval(async () => {
+      if (!DEPLOYMENT_URL) return;
+
+      try {
+        await axios.get(`${DEPLOYMENT_URL}/health`, {
+          timeout: 15000,
+          headers: {
+            'User-Agent': 'GrowAGarden-HealthCheck/1.0',
+            'Accept': 'application/json'
+          }
+        });
+        console.log(`💚 Health check completed [${platform}]: ${new Date().toISOString()}`);
+      } catch (error) {
+        console.error('💔 Health check failed:', error.message);
+      }
+    }, 15 * 60 * 1000); // 15 minutes
+
+    // Additional ping for platforms that need more frequent pings
+    if (platform === 'Render' || platform === 'Railway') {
+      setInterval(async () => {
+        if (!DEPLOYMENT_URL) return;
+        try {
+          await axios.get(`${DEPLOYMENT_URL}/keep-alive`, {
+            timeout: 8000,
+            headers: { 'User-Agent': 'KeepAlive-Bot/1.0' }
+          });
+        } catch (error) {
+          // Silent fail for frequent pings
+        }
+      }, 3 * 60 * 1000); // 3 minutes for render/railway
+    }
+
+    console.log('🚀 Auto uptime system started - Bot will stay active 24/7');
+  }, 2000);
+}
+
 // Start server
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Facebook webhook URL: https://your-repl-url.replit.dev/webhook`);
+  const platform = detectPlatform();
+  console.log(`Server running on port ${PORT} [${platform}]`);
+
+  // Detect deployment URL
+  detectDeploymentURL();
+
+  if (DEPLOYMENT_URL) {
+    console.log(`Facebook webhook URL: ${DEPLOYMENT_URL}/webhook`);
+    console.log(`Keep-alive URL: ${DEPLOYMENT_URL}/keep-alive`);
+  } else {
+    console.log(`Facebook webhook URL: [URL will be auto-detected]/webhook`);
+    console.log(`Keep-alive URL: [URL will be auto-detected]/keep-alive`);
+  }
+
   loadNotifierList();
   ensureWebSocketConnection();
+
+  // Start auto uptime system after 10 seconds
+  setTimeout(() => {
+    startUptimeSystem();
+  }, 10000);
 });
